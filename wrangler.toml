@@ -1,0 +1,23 @@
+name = "session-desk"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# The desk page lives in ./public and is served as static assets, which are free and
+# don't count towards the Workers daily request limit. Only /api/* runs the Worker.
+# /s/CODE links fall back to index.html (single-page-application mode).
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+# One Durable Object per studio session: the live room everyone connects to.
+# It also stores that session's stems and shared bounces, so no R2 bucket
+# (and no payment card) is needed.
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]

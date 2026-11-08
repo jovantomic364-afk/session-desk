@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* Layout: a studio DAW in one dark world. Top bar (studio + session), transport, arrangement (headers + waveform lanes), mixer console at the bottom. */
+:root{
+  --bg:#0e0f12;
+  --panel:#16181c;
+  --panel2:#1c1f24;
+  --line:#272b32;
+  --line2:#353a43;
+  --text:#d9dce2;
+  --dim:#7f8590;
+  --faint:#4a4f58;
+  --accent:#ffa524;
+  --play:#3ddc84;
+  --rec:#ff4b4b;
+  --display:'IBM Plex Sans Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --mono:'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  --hw:236px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font-family:var(--display);font-size:13px;overflow:hidden;user-select:none;-webkit-user-select:none;display:flex;flex-direction:column}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,[contenteditable]:focus-visible,input:focus-visible,.knob:focus-visible,.fader:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+input{font:inherit;color:inherit}
+
+/* ---------- Top bar ---------- */
+.topbar{height:54px;flex:none;display:flex;align-items:center;gap:18px;padding:0 16px;background:linear-gradient(#1b1d22,#15171b);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.logo{width:30px;height:30px;border-radius:7px;background:var(--accent);display:grid;place-items:center;color:#1a1206;font-weight:700;font-size:15px;flex:none}
+.studio-name{font-size:18px;font-weight:700;letter-spacing:.02em;outline:none;border-radius:4px;padding:2px 4px;min-width:60px;white-space:nowrap}
+.studio-name:empty:before{content:attr(data-ph);color:var(--faint)}
+.app-tag{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);border:1px solid var(--line2);border-radius:3px;padding:2px 5px;white-space:nowrap}
+.session{display:flex;gap:14px;align-items:center;margin-left:8px;min-width:0;flex:1}
+.field{display:flex;flex-direction:column;gap:1px;min-width:0}
+.field label{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.field input{background:transparent;border:0;border-bottom:1px solid var(--line2);padding:1px 0 2px;font-size:13px;font-weight:600;width:150px;outline:none}
+.field input:focus{border-bottom-color:var(--accent)}
+.field input::placeholder{color:var(--faint);font-weight:400}
+.field.small input{width:56px;font-family:var(--mono);font-size:12px}
+.rec-badge{display:none;align-items:center;gap:6px;font-family:var(--mono);font-weight:700;color:var(--rec);font-size:12px;letter-spacing:.1em}
+.rec-badge i{width:9px;height:9px;border-radius:50%;background:var(--rec);box-shadow:0 0 10px var(--rec)}
+body.rec .rec-badge{display:flex}
+body.rec .rec-badge i{animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:.2}}
+.clock{font-family:var(--mono);font-size:11px;color:var(--dim);white-space:nowrap;font-variant-numeric:tabular-nums}
+.btn{background:var(--panel2);border:1px solid var(--line2);border-radius:5px;padding:6px 11px;font-weight:600;font-size:12px;white-space:nowrap}
+.btn:hover{border-color:#4a505b;background:#22262c}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#1a1206}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn[hidden]{display:none}
+
+/* ---------- Transport ---------- */
+.transport{height:60px;flex:none;display:flex;align-items:center;gap:14px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+body.rec .transport{box-shadow:inset 0 -2px 0 var(--rec)}
+.tgroup{display:flex;gap:4px;align-items:center}
+.tbtn{width:38px;height:34px;border-radius:5px;background:var(--panel2);border:1px solid var(--line2);display:grid;place-items:center;padding:0}
+.tbtn svg{width:16px;height:16px;fill:currentColor}
+.tbtn:hover{background:#23272d}
+.tbtn.on{color:#111;border-color:transparent}
+#playBtn.on{background:var(--play)}
+#loopBtn.on{background:var(--accent)}
+#recBtn{color:var(--rec)}
+#recBtn.on{background:var(--rec);color:#fff}
+#followBtn.on{background:#58606d;color:#fff}
+.lcd{background:#0a0b0d;border:1px solid var(--line);border-radius:6px;padding:4px 12px;display:flex;gap:16px;align-items:center;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.lcd .big{font-size:22px;font-weight:700;color:var(--accent);letter-spacing:.02em}
+.lcd .sub{display:flex;flex-direction:column;font-size:11px;color:var(--dim);line-height:1.35}
+.lcd .sub b{color:var(--text);font-weight:600}
+.tempo{display:flex;align-items:center;gap:6px}
+.tempo input{width:58px;background:#0a0b0d;border:1px solid var(--line);border-radius:5px;padding:6px;font-family:var(--mono);font-weight:700;text-align:center;color:var(--text)}
+.mini-label{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.zoom{display:flex;align-items:center;gap:6px;margin-left:auto}
+.zoom input[type=range]{width:110px;accent-color:var(--accent)}
+.mmeter{display:flex;flex-direction:column;gap:3px;width:120px}
+.mmeter div{height:5px;background:#0a0b0d;border-radius:2px;overflow:hidden;position:relative}
+.mmeter i{position:absolute;inset:0;transform-origin:left;transform:scaleX(0);background:linear-gradient(90deg,#3ddc84 0 70%,#ffd23f 70% 88%,#ff4b4b 88%)}
+
+/* ---------- Arrangement ---------- */
+#arrange{flex:1;min-height:150px;display:grid;grid-template-columns:var(--hw) 1fr;grid-template-rows:30px 1fr 14px;position:relative;background:var(--bg)}
+.corner{border-right:1px solid var(--line);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 12px;background:var(--panel)}
+.corner span{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.corner .btn{padding:3px 8px;font-size:11px}
+#rulerWrap{position:relative;border-bottom:1px solid var(--line);background:var(--panel);cursor:pointer}
+#rulerWrap canvas,#lanesWrap canvas{position:absolute;left:0;top:0}
+#vscroll{grid-column:1/3;overflow-y:auto;overflow-x:hidden;display:grid;grid-template-columns:var(--hw) 1fr;align-items:start}
+#headers{border-right:1px solid var(--line);background:var(--panel);min-height:100%}
+#lanesWrap{position:relative;min-height:100%;cursor:text}
+.hrow{grid-column:1;display:none}
+#hscrollWrap{grid-column:2;overflow-x:auto;overflow-y:hidden;background:var(--panel);border-top:1px solid var(--line)}
+#hscrollWrap div{height:1px}
+.th{height:76px;border-bottom:1px solid var(--line);display:flex;position:relative}
+.th-color{width:6px;background:var(--c);flex:none}
+.th-main{flex:1;padding:8px 8px 8px 10px;display:flex;flex-direction:column;gap:7px;min-width:0}
+.th-top{display:flex;align-items:center;gap:6px}
+.th-name{flex:1;font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;outline:none;border-radius:3px;padding:1px 3px;margin-left:-3px;cursor:text}
+.th-name:focus{background:#0a0b0d;text-overflow:clip}
+.x{background:none;border:0;color:var(--faint);font-size:16px;line-height:1;padding:0 2px}
+.x:hover{color:var(--rec)}
+.th-ctrls{display:flex;align-items:center;gap:4px}
+.ms{width:24px;height:20px;border-radius:3px;border:1px solid var(--line2);background:var(--panel2);font-size:11px;font-weight:700;padding:0;color:var(--dim)}
+.ms.m.on{background:#ffd23f;color:#111;border-color:transparent}
+.ms.s.on{background:#4cc9f0;color:#111;border-color:transparent}
+.fxb{height:20px;border-radius:3px;border:1px solid var(--line2);background:var(--panel2);font-size:10px;font-weight:700;letter-spacing:.06em;padding:0 6px;color:var(--dim)}
+.fxb.lit{color:var(--accent);border-color:var(--accent)}
+.hmeter{flex:1;height:6px;background:#0a0b0d;border-radius:2px;overflow:hidden;position:relative;margin-left:4px}
+.hmeter i{position:absolute;inset:0;transform-origin:left;transform:scaleX(0);background:linear-gradient(90deg,#3ddc84 0 70%,#ffd23f 70% 88%,#ff4b4b 88%)}
+.th.dead .th-name{color:var(--dim)}
+.th.dead .th-color{filter:grayscale(1) brightness(.6)}
+
+.demo-note{position:absolute;right:14px;top:40px;z-index:3;background:rgba(22,24,28,.94);border:1px solid var(--line2);border-left:3px solid var(--accent);border-radius:6px;padding:10px 12px;max-width:330px;font-size:12px;line-height:1.45;color:var(--dim);pointer-events:auto}
+.demo-note b{color:var(--text)}
+.demo-note[hidden]{display:none}
+.empty{position:absolute;left:var(--hw);right:0;top:30px;bottom:14px;display:grid;place-items:center;z-index:2;pointer-events:none}
+.empty[hidden]{display:none}
+.empty-card{pointer-events:auto;border:1.5px dashed var(--line2);border-radius:10px;padding:26px 30px;text-align:center;max-width:420px;background:rgba(14,15,18,.85)}
+.empty-card h2{margin:0 0 6px;font-size:18px;text-wrap:balance}
+.empty-card p{margin:0 0 14px;color:var(--dim);line-height:1.5}
+.dropping{position:fixed;inset:0;z-index:50;background:rgba(255,165,36,.08);border:3px dashed var(--accent);display:none;place-items:center;font-size:22px;font-weight:700;color:var(--accent);pointer-events:none}
+body.drag .dropping{display:grid}
+
+/* ---------- Mixer ---------- */
+#mixer{height:322px;flex:none;border-top:1px solid var(--line2);background:linear-gradient(#191b20,#131418);display:flex;overflow-x:auto;overflow-y:hidden}
+#mixer.hide{display:none}
+#strips{display:flex}
+.strip{width:96px;flex:none;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:8px 6px 0;gap:6px;position:relative}
+.strip.master{width:118px;background:#1a1c21;border-left:2px solid var(--line2);margin-left:auto;position:sticky;right:0}
+.plug{width:100%;height:22px;border-radius:3px;border:1px solid var(--line2);background:#101114;font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--dim)}
+.plug.lit{color:var(--accent);border-color:rgba(255,165,36,.6)}
+.plug.on{background:var(--accent);color:#1a1206;border-color:transparent}
+.knobs{display:flex;gap:4px}
+.knob{display:flex;flex-direction:column;align-items:center;gap:1px;cursor:ns-resize;outline:none;border-radius:4px;padding:1px}
+.dial{width:34px;height:34px;border-radius:50%;position:relative;background:conic-gradient(from -135deg,#2d3139 0 270deg,transparent 270deg)}
+.dial:after{content:"";position:absolute;inset:4px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#3a3f48,#202329);box-shadow:0 1px 2px #000}
+.dial i{position:absolute;left:50%;top:50%;width:2px;height:12px;margin-left:-1px;background:#e8eaee;transform-origin:50% 0;z-index:1;border-radius:1px}
+.kv{font-family:var(--mono);font-size:9.5px;color:var(--text);font-variant-numeric:tabular-nums;height:12px}
+.kl{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.msrow{display:flex;gap:4px}
+.fwrap{display:flex;gap:6px;flex:1;align-items:stretch;padding:4px 0 2px;min-height:0}
+.fader{width:30px;position:relative;cursor:ns-resize;outline:none}
+.fader .rail{position:absolute;left:50%;top:8px;bottom:8px;width:4px;margin-left:-2px;background:#08090b;border-radius:2px;box-shadow:inset 0 0 0 1px #24272d}
+.fader .tick{position:absolute;left:0;right:0;height:1px;background:#30343c}
+.fader .tick span{position:absolute;right:calc(100% + 1px);top:-6px;font-family:var(--mono);font-size:8px;color:var(--faint)}
+.fader .cap{position:absolute;left:1px;right:1px;height:16px;border-radius:3px;background:linear-gradient(#5a606b,#3b4048 45%,#2b2f36 55%,#4a505a);box-shadow:0 2px 4px rgba(0,0,0,.6);}
+.fader .cap:after{content:"";position:absolute;left:3px;right:3px;top:7px;height:2px;background:#eef0f3;border-radius:1px}
+.vm{display:flex;gap:2px}
+.vm div{width:6px;background:#08090b;border-radius:2px;position:relative;overflow:hidden}
+.vm i{position:absolute;inset:0;transform-origin:bottom;transform:scaleY(0);background:linear-gradient(0deg,#3ddc84 0 70%,#ffd23f 70% 88%,#ff4b4b 88%)}
+.vm b{position:absolute;left:0;right:0;height:2px;background:#fff;opacity:.85;bottom:0}
+.db{font-family:var(--mono);font-size:11px;background:#08090b;border:1px solid var(--line);border-radius:3px;padding:2px 0;width:100%;text-align:center;font-variant-numeric:tabular-nums}
+.db.clip{color:var(--rec);border-color:var(--rec)}
+.sname{width:calc(100% + 12px);text-align:center;font-weight:700;font-size:11.5px;padding:6px 4px 7px;border-top:3px solid var(--c);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#101114}
+.strip.dead .sname{color:var(--dim);border-top-color:#444}
+
+/* ---------- Plugin window ---------- */
+.plugin{position:fixed;z-index:40;width:480px;background:#202329;border:1px solid #3f444d;border-radius:8px;box-shadow:0 18px 50px rgba(0,0,0,.6);display:none}
+.plugin.open{display:block}
+.ptitle{display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid #33373f;cursor:move;background:linear-gradient(#2a2e35,#23262c);border-radius:8px 8px 0 0}
+.ptitle .maker{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent)}
+.ptitle .pname{font-weight:700}
+.ptitle .ptrack{color:var(--dim);font-size:12px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pbody{padding:12px}
+.pbody canvas{width:100%;height:150px;display:block;background:#0b0c0e;border-radius:5px;border:1px solid #2c3037}
+.prow{display:flex;justify-content:space-around;align-items:flex-end;margin-top:12px}
+.prow .dial{width:44px;height:44px}
+.prow .dial i{height:16px}
+.pfoot{display:flex;gap:6px;justify-content:flex-end;margin-top:12px}
+
+/* ---------- Modal ---------- */
+.modal{position:fixed;inset:0;z-index:60;background:rgba(5,6,8,.7);display:none;place-items:center}
+.modal.open{display:grid}
+.mcard{width:min(420px,calc(100% - 32px));background:#1d2025;border:1px solid #3a3f48;border-radius:10px;padding:20px}
+.mcard h3{margin:0 0 4px;font-size:17px}
+.mcard p{margin:0 0 14px;color:var(--dim);line-height:1.5}
+.bar{height:8px;background:#0a0b0d;border-radius:4px;overflow:hidden;margin:6px 0 14px}
+.bar i{display:block;height:100%;width:40%;background:var(--accent);border-radius:4px;animation:slide 1.1s ease-in-out infinite}
+.bar.done i{width:100%;animation:none;background:var(--play)}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px}
+.stats div{background:#0f1013;border:1px solid var(--line);border-radius:6px;padding:7px 9px}
+.stats span{display:block;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.stats b{font-family:var(--mono);font-size:14px;font-variant-numeric:tabular-nums}
+.mfoot{display:flex;gap:8px;justify-content:flex-end}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#2a2e35;border:1px solid #474d57;padding:8px 14px;border-radius:6px;z-index:70;display:none;font-size:12.5px}
+.toast.show{display:block}
+
+@media (max-width:900px){
+  .session .field:not(.keep){display:none}
+  .zoom{display:none}
+  .clock{display:none}
+  :root{--hw:170px}
+}
+@media (prefers-reduced-motion:reduce){
+  body.rec .rec-badge i{animation:none}
+  .bar i{animation:none;width:100%}
+}
+
+/* ---------- Multiplayer additions ---------- */
+.lockable{}
+body.locked .lockable{pointer-events:none}
+body.locked .knob,body.locked .fader{cursor:default}
+body.locked #rulerWrap,body.locked #lanesWrap{cursor:default}
+body.locked .transport .lockable,body.locked .transport .guard{opacity:.45}
+body.locked #addBtn,body.locked .x{display:none}
+
+.codechip{display:flex;align-items:center;gap:8px;background:#0a0b0d;border:1px solid var(--line2);border-radius:5px;padding:4px 6px 4px 10px;font-family:var(--mono);font-size:12px;white-space:nowrap}
+.codechip b{color:var(--accent);letter-spacing:.12em}
+.peoplewrap{position:relative}
+.people{position:absolute;right:0;top:calc(100% + 8px);width:320px;background:#1d2025;border:1px solid #3a3f48;border-radius:8px;box-shadow:0 16px 40px rgba(0,0,0,.55);z-index:45;display:none;padding:12px}
+.people.open{display:block}
+.people h4{margin:0 0 8px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);font-weight:600}
+.invite{display:flex;gap:6px;margin-bottom:14px}
+.invite input{flex:1;min-width:0;background:#0a0b0d;border:1px solid var(--line2);border-radius:5px;padding:6px 8px;font-family:var(--mono);font-size:11px;color:var(--text)}
+.plist{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;max-height:260px;overflow:auto}
+.prow2{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:5px;background:#16181c}
+.prow2 .pn{flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag{font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:2px 5px;border-radius:3px;border:1px solid var(--line2);color:var(--dim);white-space:nowrap}
+.tag.eng{color:var(--accent);border-color:rgba(255,165,36,.5)}
+.tag.desk{color:#111;background:var(--play);border-color:transparent}
+.tag.you{color:var(--text)}
+.prow2 .btn{padding:3px 8px;font-size:11px}
+.danger{background:transparent;border-color:rgba(255,75,75,.5);color:var(--rec)}
+.danger:hover{background:rgba(255,75,75,.12);border-color:var(--rec)}
+.danger.arm{background:var(--rec);color:#fff}
+
+.deskbar{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--dim);white-space:nowrap;min-width:0}
+.deskbar .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
+.deskbar.mine .dot{background:var(--play);box-shadow:0 0 8px var(--play)}
+.deskbar.mine{color:var(--text)}
+.deskbar.off .dot{background:var(--rec)}
+.deskbar span{overflow:hidden;text-overflow:ellipsis}
+.deskbar .btn{padding:3px 8px;font-size:11px}
+.mon{display:flex;align-items:center;gap:6px}
+.mon input{width:80px;accent-color:#9aa3b2}
+
+.th .status{position:absolute;right:8px;bottom:6px;font-size:10px;font-family:var(--mono);color:var(--accent)}
+
+/* full-screen cards: landing, gate, ended */
+.screen{position:fixed;inset:0;z-index:80;display:none;place-items:center;background:radial-gradient(1200px 600px at 50% 0%,#1d1a14,var(--bg) 60%);overflow:auto;padding:16px}
+.screen.open{display:grid}
+.card{width:min(440px,100%);background:#191b20;border:1px solid #33373f;border-radius:12px;padding:26px}
+.card .logo{margin-bottom:14px;width:40px;height:40px;font-size:20px;border-radius:9px}
+.card h1{margin:0 0 6px;font-size:24px;text-wrap:balance}
+.card h2{margin:22px 0 8px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);font-weight:600}
+.card p{margin:0 0 6px;color:var(--dim);line-height:1.5;max-width:60ch}
+.card .row{display:flex;gap:8px}
+.card input{flex:1;min-width:0;background:#0d0e11;border:1px solid var(--line2);border-radius:6px;padding:9px 11px;color:var(--text);font-size:14px;outline:none}
+.card input:focus{border-color:var(--accent)}
+.card input.code{font-family:var(--mono);letter-spacing:.2em;text-transform:uppercase}
+.card .btn{padding:9px 14px;font-size:13px}
+.card .err{color:var(--rec);font-size:12.5px;min-height:18px;margin-top:8px}
+.card .note{font-size:12px;color:var(--dim);margin-top:14px;line-height:1.5}
+.card .eng-note{display:inline-block;margin:4px 0 6px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+
+/* ---------- v3: song map, rack, buses, snapshots, analyser, credits, booth ---------- */
+#arrange{grid-template-rows:44px 1fr 14px}
+.empty{top:44px}
+.demo-note{top:54px}
+.transport{gap:10px}
+.tsep{width:1px;height:30px;background:var(--line2);flex:none}
+.tbtn.txt{width:auto;padding:0 9px;font-size:11px;font-weight:700;letter-spacing:.04em}
+#clickBtn.on,#countBtn.on{background:#4cc9f0;color:#111}
+
+.rec-badge{white-space:nowrap}
+.pop{position:absolute;top:calc(100% + 8px);background:#1d2025;border:1px solid #3a3f48;border-radius:8px;box-shadow:0 16px 40px rgba(0,0,0,.55);z-index:46;display:none;padding:12px;text-align:left}
+.pop.open{display:block}
+.pop h4{margin:0 0 8px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);font-weight:600;display:flex;justify-content:space-between;align-items:center}
+.popwrap{position:relative}
+#mapPop{left:0;width:400px;max-height:70vh;overflow:auto}
+#bouncePop{right:0;width:360px}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
+.chip{border:1px solid var(--line2);background:var(--panel2);border-radius:12px;padding:3px 9px;font-size:11px;font-weight:600}
+.chip:hover{border-color:var(--accent)}
+.mrows{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
+.mrow{display:flex;align-items:center;gap:6px;background:#16181c;border-radius:5px;padding:5px 6px}
+.mrow input{flex:1;min-width:0;background:transparent;border:0;border-bottom:1px solid transparent;color:var(--text);font-weight:600;padding:2px 0;outline:none}
+.mrow input:focus{border-bottom-color:var(--accent)}
+.mrow .when{font-family:var(--mono);font-size:10.5px;color:var(--dim);white-space:nowrap}
+.mrow .sw{width:10px;height:10px;border-radius:2px;flex:none}
+.mrow .btn{padding:2px 7px;font-size:10.5px}
+.mempty{color:var(--faint);font-size:12px;padding:4px 2px 10px}
+body.locked .ctl-only{display:none !important}
+
+.th-color{width:12px;cursor:grab;position:relative}
+.th-color:after{content:"";position:absolute;left:3px;right:3px;top:50%;height:14px;margin-top:-7px;background:repeating-linear-gradient(0deg,rgba(0,0,0,.35) 0 2px,transparent 2px 4px)}
+body.locked .th-color{cursor:default}
+.th.dragging{opacity:.5}
+.dropline{position:absolute;left:0;right:0;height:2px;background:var(--accent);z-index:5;pointer-events:none;display:none}
+.swatches{position:fixed;z-index:47;background:#1d2025;border:1px solid #3a3f48;border-radius:8px;padding:8px;display:none;grid-template-columns:repeat(5,22px);gap:6px;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+.swatches.open{display:grid}
+.swatches button{width:22px;height:22px;border-radius:4px;border:2px solid transparent;padding:0}
+.swatches button.cur{border-color:#fff}
+
+#mixer{height:384px}
+.strip{width:106px}
+.strip .knobs{gap:2px}
+.strip .dial{width:28px;height:28px}
+.strip .dial:after{inset:3px}
+.strip .dial i{height:10px}
+.strip .kl{font-size:8.5px;letter-spacing:.08em}
+.route{width:100%;height:18px;border-radius:3px;border:1px dashed var(--line2);background:transparent;font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 4px}
+.route.bus{border-style:solid;color:var(--text)}
+.strip.busstrip{background:#15171b;width:96px}
+.busstrip .bustag{font-size:9px;letter-spacing:.16em;color:var(--dim);font-weight:700}
+.busstrip .sname{outline:none}
+.addbus{width:64px;flex:none;display:flex;align-items:flex-start;justify-content:center;padding-top:10px;border-right:1px solid var(--line)}
+.addbus .btn{padding:6px 8px;font-size:11px;writing-mode:horizontal-tb}
+.strip .x{position:absolute;top:2px;right:2px;font-size:13px}
+.analyzer{margin-left:auto;flex:none;width:300px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;border-left:1px solid var(--line)}
+.analyzer h5{margin:0;font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);font-weight:600;display:flex;justify-content:space-between}
+.analyzer canvas{width:100%;height:120px;background:#0a0b0d;border:1px solid var(--line);border-radius:5px;display:block}
+.lufs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.lufs div{background:#0a0b0d;border:1px solid var(--line);border-radius:5px;padding:6px 8px}
+.lufs span{display:block;font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.lufs b{font-family:var(--mono);font-size:16px;font-variant-numeric:tabular-nums}
+.lufs-note{font-size:10.5px;color:var(--dim);line-height:1.4}
+.strip.master{margin-left:0}
+.snaps{display:flex;gap:3px;width:100%}
+.snaps button{flex:1;height:22px;border-radius:3px;border:1px solid var(--line2);background:#101114;font-weight:700;font-size:11px;padding:0;color:var(--dim)}
+.snaps button.has{color:var(--text)}
+.snaps button.act{background:var(--accent);color:#1a1206;border-color:transparent}
+.snaps button.store{font-size:9px;letter-spacing:.06em;flex:1.3}
+.snaps button.store.arm{background:#4cc9f0;color:#111;border-color:transparent}
+.echo-div{width:100%;height:20px;border-radius:3px;border:1px solid var(--line2);background:#101114;font-family:var(--mono);font-size:10px;color:var(--text);padding:0}
+
+.plugin{width:540px;max-height:calc(100vh - 80px);overflow:auto}
+.dev{border-top:1px solid #2f333b;padding:10px 12px;display:flex;align-items:center;gap:12px}
+.dev .dname{flex:1;min-width:0}
+.dev .dname small{display:block;font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.dev .dname b{font-size:13px}
+.dev .dname p{margin:2px 0 0;font-size:11px;color:var(--dim)}
+.pow{width:34px;height:20px;border-radius:10px;border:1px solid var(--line2);background:#101114;position:relative;padding:0;flex:none}
+.pow:after{content:"";position:absolute;top:3px;left:3px;width:12px;height:12px;border-radius:50%;background:#555b65;transition:transform .12s}
+.pow.on{background:rgba(61,220,132,.2);border-color:var(--play)}
+.pow.on:after{transform:translateX(14px);background:var(--play)}
+.dev .knob .dial{width:34px;height:34px}
+.routing{display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid #2f333b;font-size:12px;color:var(--dim)}
+.routing select{background:#101114;color:var(--text);border:1px solid var(--line2);border-radius:4px;padding:4px 6px;font:inherit}
+
+.booth{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--dim);white-space:nowrap;border:1px solid var(--line2);border-radius:5px;padding:3px 4px 3px 8px}
+.booth[hidden]{display:none}
+.booth.me{border-color:rgba(255,75,75,.6);color:var(--text)}
+.booth .btn{padding:2px 8px;font-size:11px}
+.micm{width:44px;height:6px;background:#0a0b0d;border-radius:2px;overflow:hidden;position:relative}
+.micm i{position:absolute;inset:0;transform-origin:left;transform:scaleX(0);background:linear-gradient(90deg,#3ddc84 0 70%,#ffd23f 70% 88%,#ff4b4b 88%)}
+
+.mcard.wide{width:min(760px,calc(100% - 32px))}
+#creditsCanvas{width:100%;height:auto;display:block;border-radius:8px;border:1px solid var(--line);margin-bottom:14px}
+.blist{display:flex;flex-direction:column;gap:5px;max-height:320px;overflow:auto}
+.brow{background:#16181c;border-radius:5px;padding:7px 9px;display:flex;align-items:center;gap:8px}
+.brow .bn{flex:1;min-width:0}
+.brow .bn b{display:block;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brow .bn span{font-size:10.5px;color:var(--dim);font-family:var(--mono)}
+.brow a{color:#111;background:var(--accent);border-radius:4px;padding:4px 9px;font-weight:700;font-size:11px;text-decoration:none;white-space:nowrap}
+
+@media (max-width:1500px){ .clock{display:none} .field input{width:118px} }
+@media (max-width:1300px){ .zoom{display:none} .mon .mini-label{display:none} .analyzer{width:240px} }
+
+/* ---------- Talkback chat ---------- */
+#arrange{--chatw:0px;grid-template-columns:var(--hw) 1fr var(--chatw)}
+body.chat-open #arrange{--chatw:300px}
+.empty{right:var(--chatw)}
+.demo-note{right:calc(var(--chatw) + 14px)}
+#chat{grid-column:3;grid-row:1 / span 3;display:none;flex-direction:column;min-height:0;background:#14161a;border-left:1px solid var(--line2)}
+body.chat-open #chat{display:flex}
+.chead{height:44px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 12px;border-bottom:1px solid var(--line)}
+.chead b{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+.cmsgs{flex:1;min-height:0;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:9px;user-select:text;-webkit-user-select:text}
+.cm{font-size:13px;line-height:1.4;overflow-wrap:anywhere}
+.cm .meta{display:flex;align-items:baseline;gap:6px;margin-bottom:1px}
+.cm .who{font-weight:700}
+.cm.eng .who{color:var(--accent)}
+.cm.mine .who{color:#4cc9f0}
+.cm .t{font-family:var(--mono);font-size:10px;color:var(--faint)}
+
+.cm .bartag{font-family:var(--mono);font-size:10px;color:#ff6fb5;background:rgba(255,111,181,.1);border:1px solid rgba(255,111,181,.35);border-radius:3px;padding:0 4px}
+button.bartag{cursor:pointer;line-height:1.4}
+.cm .txt{color:var(--text)}
+.csys{font-size:11.5px;color:var(--faint);text-align:center}
+.cempty{color:var(--faint);font-size:12.5px;line-height:1.5;text-align:center;margin:auto 8px}
+.cform{display:flex;gap:6px;padding:10px;border-top:1px solid var(--line)}
+.cform input{flex:1;min-width:0;background:#0a0b0d;border:1px solid var(--line2);border-radius:5px;padding:8px 9px;color:var(--text);outline:none;font-size:13px}
+.cform input:focus{border-color:var(--accent)}
+.cform .btn{padding:6px 10px}
+#chatBtn.unread{border-color:var(--accent);color:var(--accent)}
+body.chat-open #chatBtn{background:#2a2e35}
+.grbox{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:10px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase}
+.grm{width:120px;height:6px;background:#0a0b0d;border-radius:2px;overflow:hidden;position:relative}
+.grm i{position:absolute;inset:0;transform-origin:left;transform:scaleX(0);background:#ff6fb5}
+.grbox b{font-family:var(--mono);font-size:11px;color:var(--text);letter-spacing:0;text-transform:none;font-variant-numeric:tabular-nums}
+.routing[hidden]{display:none}
+</style>
+</head>
+<body class="locked">
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo" aria-hidden="true">S</div>
+    <div class="studio-name lockable" id="studioName" contenteditable="false" spellcheck="false" data-ph="Name your studio" aria-label="Studio name"></div>
+    <span class="app-tag">Session Desk</span>
+  </div>
+  <div class="session">
+    <div class="field keep"><label for="fArtist">Artist</label><input id="fArtist" placeholder="Who's recording" spellcheck="false" readonly></div>
+    <div class="field keep"><label for="fTitle">Track</label><input id="fTitle" placeholder="Song title" spellcheck="false" readonly></div>
+    <div class="field"><label for="fEngineer">Engineer</label><input id="fEngineer" placeholder="At the desk" spellcheck="false" readonly></div>
+    <div class="field small"><label for="fKey">Key</label><input id="fKey" placeholder="A min" spellcheck="false" readonly></div>
+    <div class="rec-badge" aria-live="polite"><i></i><span>REC</span></div>
+  </div>
+  <span class="clock" id="clock" title="Time since you joined">SESSION 00:00:00</span>
+  <div class="codechip" title="Session code">Session <b id="codeLabel">------</b></div>
+  <div class="peoplewrap">
+    <button class="btn" id="peopleBtn" aria-expanded="false">1 in room</button>
+    <div class="people" id="people">
+      <h4>Invite link</h4>
+      <div class="invite"><input id="inviteUrl" readonly aria-label="Invite link"><button class="btn" id="copyBtn">Copy</button></div>
+      <h4>In the room</h4>
+      <div class="plist" id="plist"></div>
+      <button class="btn danger" id="endBtn" hidden>End session and delete stems</button>
+    </div>
+  </div>
+  <div class="popwrap">
+    <button class="btn" id="bouncesBtn" aria-expanded="false">Bounces</button>
+    <div class="pop" id="bouncePop">
+      <h4>Shared bounces</h4>
+      <div class="blist" id="blist"></div>
+    </div>
+  </div>
+  <button class="btn" id="chatBtn" title="Talkback chat with the room (T)" aria-expanded="false">Talkback</button>
+  <button class="btn" id="creditsBtn" title="Session credits card">Credits</button>
+  <button class="btn" id="mixerToggle" title="Show or hide the mixer (X)">Mixer</button>
+  <button class="btn primary" id="bounceBtn" title="Render the mix to a WAV file">Bounce mix</button>
+</header>
+
+<div class="transport">
+  <div class="tgroup">
+    <button class="tbtn guard" id="startBtn" title="Back to start (Enter)" aria-label="Back to start"><svg viewBox="0 0 16 16"><path d="M2 2h2v12H2zM14 2v12L5 8z"/></svg></button>
+    <button class="tbtn guard" id="stopBtn" title="Stop" aria-label="Stop"><svg viewBox="0 0 16 16"><path d="M3 3h10v10H3z"/></svg></button>
+    <button class="tbtn guard" id="playBtn" title="Play / pause (Space)" aria-label="Play"><svg viewBox="0 0 16 16" id="playIcon"><path d="M4 2l10 6-10 6z"/></svg></button>
+    <button class="tbtn guard" id="recBtn" title="Recording light, for the scene. It doesn't record audio. (R)" aria-label="Recording light"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5"/></svg></button>
+    <button class="tbtn guard" id="loopBtn" title="Loop the orange region (L). Drag on the ruler to set it." aria-label="Loop"><svg viewBox="0 0 16 16"><path d="M4 5h7V3l3 3-3 3V7H4a1 1 0 0 0-1 1v1H1V8a3 3 0 0 1 3-3zm8 4h2v1a3 3 0 0 1-3 3H4v2l-3-3 3-3v2h7a1 1 0 0 0 1-1z"/></svg></button>
+    <button class="tbtn on" id="followBtn" title="Keep the playhead in view" aria-label="Follow playhead"><svg viewBox="0 0 16 16"><path d="M7 1h2v3H7zM3 6h10l-5 9z"/></svg></button>
+    <span class="tsep"></span>
+    <button class="tbtn txt guard" id="clickBtn" title="Click track: a metronome at the session tempo (C)">Click</button>
+    <button class="tbtn txt guard" id="countBtn" title="Count in one bar before playing or recording">1-2-3-4</button>
+  </div>
+  <div class="lcd" aria-label="Position">
+    <span class="big" id="lcdBars">001.1.1</span>
+    <span class="sub"><span><b id="lcdTime">0:00.000</b></span><span id="lcdLen">of 0:00</span></span>
+  </div>
+  <div class="tempo">
+    <span class="mini-label">BPM</span>
+    <input id="bpm" class="lockable" type="number" min="40" max="240" step="1" value="96" aria-label="Tempo in BPM" readonly>
+    <button class="btn guard" id="tapBtn" title="Tap along to set the tempo">Tap</button>
+  </div>
+  <div class="popwrap">
+    <button class="btn" id="mapBtn" aria-expanded="false" title="Song sections and markers">Song map</button>
+    <div class="pop" id="mapPop">
+      <h4>Sections <span class="ctl-only" style="text-transform:none;letter-spacing:0">click to add from the loop region</span></h4>
+      <div class="chips ctl-only" id="secChips"></div>
+      <div class="mrows" id="secRows"></div>
+      <h4>Markers <button class="btn ctl-only" id="addMarkerBtn" style="padding:2px 8px;font-size:11px">+ At playhead (M)</button></h4>
+      <div class="mrows" id="markRows"></div>
+    </div>
+  </div>
+  <div class="deskbar" id="deskbar"><i class="dot"></i><span id="deskText">Connecting…</span><button class="btn" id="deskAction" hidden></button></div>
+  <div class="zoom">
+    <span class="mini-label">Zoom</span>
+    <input type="range" id="zoom" min="0" max="100" value="45" aria-label="Zoom">
+  </div>
+  <div class="mon" title="Your own listening volume. Doesn't change the mix for anyone else.">
+    <span class="mini-label">Monitor</span>
+    <input type="range" id="monitor" min="0" max="100" value="85" aria-label="Your monitor volume">
+  </div>
+</div>
+
+<section id="arrange">
+  <div class="corner"><span id="trackCount">0 tracks</span><button class="btn lockable" id="addBtn">+ Stems</button></div>
+  <div id="rulerWrap"><canvas id="ruler"></canvas></div>
+  <div id="vscroll">
+    <div id="headers" style="position:relative"><div class="dropline" id="dropline"></div></div>
+    <div id="lanesWrap"><canvas id="lanes"></canvas></div>
+  </div>
+  <div class="hrow"></div>
+  <div id="hscrollWrap"><div id="hspacer"></div></div>
+
+  <aside id="chat" aria-label="Talkback chat">
+    <div class="chead"><b>Talkback</b><button class="x" id="chatClose" aria-label="Close talkback" style="display:block">×</button></div>
+    <div class="cmsgs" id="cmsgs" aria-live="polite"></div>
+    <form class="cform" id="chatForm"><input id="chatIn" maxlength="300" placeholder="Talk to the room…" autocomplete="off" aria-label="Message"><button class="btn primary" type="submit">Send</button></form>
+  </aside>
+  <div class="demo-note" id="demoNote" hidden></div>
+  <div class="empty" id="empty" hidden>
+    <div class="empty-card">
+      <h2 id="emptyTitle">Drop your stems to start</h2>
+      <p id="emptyText">WAV or MP3, one file per stem, or the stems zip straight from Suno. They upload once and load for everyone in the room.</p>
+      <button class="btn primary lockable" id="emptyAdd">Choose stem files</button>
+    </div>
+  </div>
+</section>
+
+<section id="mixer" aria-label="Mixer">
+  <div id="strips"></div>
+  <div id="busStrips" style="display:flex"></div>
+  <div class="addbus ctl-only"><button class="btn" id="addBusBtn" title="Add a bus: a group fader for several tracks">+ Bus</button></div>
+  <div class="analyzer">
+    <h5><span>Master spectrum</span><span id="specRange">30 Hz – 16 kHz</span></h5>
+    <canvas id="spec" width="560" height="240"></canvas>
+    <h5><span>Loudness (LUFS)</span></h5>
+    <div class="lufs">
+      <div><span>Momentary</span><b id="lufsM">–</b></div>
+      <div><span>Short-term</span><b id="lufsS">–</b></div>
+      <div><span>Integrated</span><b id="lufsI">–</b></div>
+    </div>
+    <div class="lufs-note">Integrated resets each time playback starts. Streaming services play songs at about −14 LUFS.</div>
+  </div>
+  <div class="strip master" id="masterStrip"></div>
+</section>
+
+<div class="plugin" id="plugin" role="dialog" aria-label="Channel rack">
+  <div class="ptitle" id="ptitle">
+    <span><span class="maker">Channel rack</span><br><span class="pname" id="ptrack"></span></span>
+    <span class="ptrack" id="pview"></span>
+    <button class="x" id="pclose" aria-label="Close rack" style="display:block">×</button>
+  </div>
+  <div class="routing"><label for="routeSel">Output</label><select id="routeSel" class="lockable"></select></div>
+  <div id="rack"></div>
+</div>
+
+<div class="swatches" id="swatches"></div>
+
+<div class="modal" id="bounceModal" role="dialog" aria-modal="true" aria-labelledby="bTitle">
+  <div class="mcard">
+    <h3 id="bTitle">Bouncing mix</h3>
+    <p id="bText">Rendering every stem through the desk, with the current mix and rack settings.</p>
+    <div class="bar" id="bBar"><i></i></div>
+    <div class="stats" id="bStats" hidden>
+      <div><span>Length</span><b id="bLen">–</b></div>
+      <div><span>Peak</span><b id="bPeak">–</b></div>
+      <div><span>Format</span><b>WAV 16</b></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn" id="bClose">Close</button>
+      <button class="btn" id="bShare" hidden>Share with room</button>
+      <button class="btn primary" id="bSave" hidden>Save WAV</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="creditsModal" role="dialog" aria-modal="true" aria-labelledby="cTitle">
+  <div class="mcard wide">
+    <h3 id="cTitle">Session credits</h3>
+    <p>Screenshot it, save it as an image, or copy the text for a post.</p>
+    <canvas id="creditsCanvas" width="1200" height="675"></canvas>
+    <div class="mfoot">
+      <button class="btn" id="cClose">Close</button>
+      <button class="btn" id="cCopy">Copy text</button>
+      <button class="btn primary" id="cSave">Save image</button>
+    </div>
+  </div>
+</div>
+
+<!-- Landing: no session code in the address -->
+<div class="screen" id="landing">
+  <div class="card">
+    <div class="logo" aria-hidden="true">S</div>
+    <h1>Session Desk</h1>
+    <p>A shared studio desk for roleplay recording sessions. Start a session, send the link to your artist, and everyone in the room hears the same mix in sync.</p>
+    <h2>Start a session</h2>
+    <form class="row" id="startForm">
+      <input id="startStudio" placeholder="Studio name" maxlength="60" aria-label="Studio name" autocomplete="off">
+      <button class="btn primary" type="submit" id="startGo">Start</button>
+    </form>
+    <h2>Join a session</h2>
+    <form class="row" id="joinForm">
+      <input id="joinCode" class="code" placeholder="CODE" maxlength="6" aria-label="Session code" autocomplete="off">
+      <button class="btn" type="submit">Join</button>
+    </form>
+    <div class="err" id="landErr"></div>
+    <p class="note">Sessions and their stems are deleted when the engineer ends the session, or 20 minutes after everyone has left.</p>
+  </div>
+</div>
+
+<!-- Gate: name + one click to enable audio -->
+<div class="screen" id="gate">
+  <div class="card">
+    <div class="logo" aria-hidden="true">S</div>
+    <span class="eng-note" id="gateEng" hidden>You're the engineer</span>
+    <h1 id="gateTitle">Join session</h1>
+    <p id="gateText">Enter your character name. Audio starts when you click in, because browsers need a click before they play sound.</p>
+    <h2>Your name</h2>
+    <form class="row" id="gateForm">
+      <input id="gateName" placeholder="Character name" maxlength="32" aria-label="Your name" autocomplete="off">
+      <button class="btn primary" type="submit">Enter the studio</button>
+    </form>
+    <div class="err" id="gateErr"></div>
+  </div>
+</div>
+
+<!-- Ended / not found -->
+<div class="screen" id="ended">
+  <div class="card">
+    <div class="logo" aria-hidden="true">S</div>
+    <h1 id="endTitle">Session ended</h1>
+    <p id="endText">The stems from this session have been deleted.</p>
+    <p class="note"><a href="/" style="color:var(--accent)">Start or join another session</a></p>
+  </div>
+</div>
+
+<div class="dropping">Drop stems or a zip to load them for everyone</div>
+<div class="toast" id="toast" role="status"></div>
+<input type="file" id="fileIn" accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a,.aiff,.aif,.zip,application/zip" multiple hidden>
+<script src="/app.js"></script>
+</body>
+</html>
