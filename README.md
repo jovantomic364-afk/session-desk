@@ -4,11 +4,13 @@ A shared studio desk for roleplay recording sessions. The engineer starts a sess
 
 ## Run your own copy (one click)
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/YOUR-GITHUB-NAME/session-desk)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/jovantomic364-afk/session-desk)
+
+**Who needs what:** players joining a session need nothing, no accounts at all. Only the person setting up a copy needs a free **GitHub** account and a free **Cloudflare** account.
 
 The button copies this project into your own GitHub account and deploys it to your own Cloudflare account. You get your own address, e.g. `https://session-desk.<you>.workers.dev`. It runs on Cloudflare's free plan, and you don't need a payment card.
 
-> Maintainer: replace `YOUR-GITHUB-NAME` in the link above with your GitHub name once the repo is public.
+No GitHub account? Use **Deploy by hand** below instead. It only needs Node.js and the Cloudflare account.
 
 ## Deploy by hand
 
